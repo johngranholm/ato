@@ -1,0 +1,21 @@
+{
+  "last_completed_goal": "Hello?",
+  "history": [
+    {
+      "goal": "Hello?",
+      "status": "done",
+      "t": 1781386250.6530051,
+      "recipe": []
+    }
+  ],
+  "crashes": [],
+  "session": {
+    "clean_exit": true,
+    "active_goal": null,
+    "active_command": null,
+    "active_shell": null,
+    "started": 1781386222.853843,
+    "pid": 3556
+  },
+  "memory_on": true
+}
