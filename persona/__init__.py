@@ -1,0 +1,1 @@
+"""Persona: freely-mutable cosmetics. The engine never knows it's a princess."""

@@ -1,0 +1,1 @@
+"""Core engine: mutable, git-tracked, self-editable (except where protected)."""

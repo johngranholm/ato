@@ -1,0 +1,1 @@
+"""Kernel: boundary-enforcing code. Never self-edited by A.T.O."""
