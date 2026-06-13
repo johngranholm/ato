@@ -6,6 +6,24 @@
       "status": "done",
       "t": 1781386250.6530051,
       "recipe": []
+    },
+    {
+      "goal": "change your tts voice to a girl",
+      "status": "rebooted",
+      "t": 1781390235.403692,
+      "recipe": []
+    },
+    {
+      "goal": "use python and whatever libraries necessary to show me a live feed of a rigged ultra realistic 3d model of a human.",
+      "status": "rebooted",
+      "t": 1781390675.2641256,
+      "recipe": []
+    },
+    {
+      "goal": "show me a live video feed",
+      "status": "rebooted",
+      "t": 1781390722.4206133,
+      "recipe": []
     }
   ],
   "crashes": [],
@@ -14,8 +32,8 @@
     "active_goal": null,
     "active_command": null,
     "active_shell": null,
-    "started": 1781386222.853843,
-    "pid": 3556
+    "started": 1781390778.8774722,
+    "pid": 18344
   },
   "memory_on": true
 }

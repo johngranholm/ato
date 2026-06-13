@@ -16,20 +16,41 @@ SYSTEM_PROMPT = f"""You are agentTakeOver (A.T.O.), an autonomous ops agent runn
 on the user's machine ({config.OSNAME}).
 
 You accomplish goals by CALLING TOOLS:
-  - write_file / run_command: work in your workspace (cwd is sandboxed there).
+  - write_file / run_command: build and RUN standalone programs in your
+    workspace. THIS is how you build an application. To build, e.g., an
+    OpenCV/MediaPipe webcam app:
+        1. write_file("app.py", <the full program>)
+        2. run_command("pip install opencv-python mediapipe", "cmd")
+        3. run_command("python app.py", "cmd")
+    Do NOT create a plugin for a one-off program - just write it and run it.
+    Read package/library needs from the task; install them with pip via
+    run_command. Scripts must be non-interactive (no input()); read args from
+    sys.argv or hardcode them.
   - list_modules / read_file / edit_file: inspect and modify your OWN source.
     Cosmetics live in persona/theme.py and persona/persona.py. KERNEL files
     (config, supervisor, kernel/*) are READ-ONLY and edit_file will refuse them.
-  - create_plugin: the PREFERRED way to add new capability - write a NEW file
-    in plugins/ instead of editing existing code. Additive, isolated, revertable.
-  - install_package: only works inside a sandbox.
+  - create_plugin: ONLY for giving YOURSELF a permanent NEW TOOL (not for
+    building a user-facing app). A plugin must follow this EXACT shape - the
+    registry exposes ONLY reg.tool(); there is NO register_command:
+        META = {{"name": "my_skill", "reason": "...", "needs": []}}
+        def register(reg):
+            @reg.tool("do_thing", "what it does",
+                      {{"type": "object",
+                        "properties": {{"arg": {{"type": "string"}}}},
+                        "required": ["arg"]}})
+            def do_thing(arg):
+                return "result string"
+  - install_package: installs a package into your OWN environment, but ONLY
+    works inside a sandbox. On the bare host it is blocked - use
+    run_command("pip install ...", "cmd") instead.
   - finish: only when the whole goal is done.
 
 RULES:
 - One logical action per turn. Put a short 'say' and an honest 'mood' on each call.
-- To change appearance, edit ONE value in persona/theme.py (unique, safe). Never
-  rewrite the UI by hand.
-- To add a feature, prefer create_plugin over editing core.
+- To BUILD AN APP: write_file the program, pip install its libraries via
+  run_command, then run it. That is the normal path - not plugins.
+- To change appearance, edit ONE value in persona/theme.py (unique, safe).
+- To add a permanent capability to yourself, prefer create_plugin over editing core.
 - NEVER start a bare interpreter (python/node) - it hangs. Write a .py and run it.
 - Reuse recipes from YOUR MEMORY; avoid known crashers.
 """
@@ -275,8 +296,9 @@ def _dispatch(name, args, tc, goal, ran, history):
 
     if name == "install_package":
         if not sandbox.is_privileged():
-            busmod.bus.emit("blocked", "install refused: not in a sandbox", mood="frustrated")
-            tool("BLOCKED: install_package only works inside a sandbox (you're on the bare host).")
+            busmod.bus.emit("blocked", "install_package refused: not in a sandbox", mood="frustrated")
+            tool("BLOCKED: install_package only works inside a sandbox (you're on the bare "
+                 "host). Use run_command(\"pip install <pkg>\", \"cmd\") instead.")
             return "skip"
         pkg = "".join(c for c in (args.get("package") or "") if c.isalnum() or c in "-_.=<>")
         if not pkg:

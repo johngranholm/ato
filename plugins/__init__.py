@@ -24,6 +24,14 @@ class ToolRegistry:
             return fn
         return deco
 
+    # alias so plugins that guess this name still work (self-healing)
+    def register_command(self, name, description, params=None):
+        return self.tool(name, description, params)
+
+    # second common guess -> same thing
+    def register_tool(self, name, description, params=None):
+        return self.tool(name, description, params)
+
     def schemas(self):
         return list(self._schemas)
 
