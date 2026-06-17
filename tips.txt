@@ -1,0 +1,33 @@
+Setup, run, commit
+1. Fix git on PATH (the real fix for item 4). Easiest permanent fix: re-run the Git for Windows installer → on the PATH screen choose "Git from the command line and also from 3rd-party software." The new config.find_git() will also locate it automatically even if it's not on PATH, so the supervisor message should disappear either way. Verify in your Python terminal:
+
+cmd
+git --version
+2. Run:
+
+cmd
+python -m ato
+3. Commit:
+
+cmd
+git add ato/config.py ato/kernel/safety.py ato/kernel/bootstrap.py ato/supervisor.py ato/core/selfedit.py ato/core/agent_loop.py ato/core/archive.py ato/core/gaze.py ato/runtime.py ato/persona/ui.html
+git commit -m "Remove restrictions, script archive, gaze bridge, git locator, no step limit, GPT-5.5"
+git push
+git branch -f lastgood HEAD && git push origin lastgood
+How to actually use the gaze feature
+Tell A.T.O. something like:
+
+"Edit my intruderAlert app so that while it's running, every frame it writes the detected person's normalized screen position to C:\ato\state\gaze.json as {"x":..,"y":..,"label":"intruder"}. Then run it, and your avatar should turn to look wherever it detects motion."
+
+A.T.O. now has the convention baked into its prompt, the watcher is native, and the avatar's lookAt is wired. When intruderAlert dumps coordinates, the A.T.O. avatar you talk to will physically turn its head toward the detected location.
+
+Mapped to your six asks
+Restrictions removed — RESTRICTIONS=False kills the denylist + path jail; only the supervisor/entry point stay protected so recovery always works.
+Copy of every script — archive.py saves a timestamped version on every write_file (and every self-edit), under C:\ato\script_archive. "Worked then broke" is now always recoverable, and the prompt tells A.T.O. to recover from the archive instead of rewriting.
+Self-edit fixed — git locator restores the commit/reboot path; ALLOW_KERNEL_EDIT=True opens up all non-harness files including ui.html; prompt now instructs the read-with-contains→edit workflow. Plus the avatar-gaze capability is now native, so "look in a direction" works without a fragile UI self-edit.
+git not found — config.find_git() searches PATH + common install dirs; permanent fix is the installer PATH option.
+Doesn't stop before asking / auto iterates — step limit removed (STEP_MAX=0), and in auto it now nudges itself to keep prototyping and must call ask_user for your review before it can finish.
+Model upgraded — defaults to GPT-5.5 (current flagship), resolving against your account with GPT-5.4 / 5.3-Codex fallbacks.
+One honest caveat on the gaze head-turn: thHead.lookAt(x, y, t) is the documented TalkingHead method and should work, but exact gaze range depends on the avatar's rig. If brunette.glb barely moves its head, tell me and I'll switch the approach to rotating the whole avatar container instead, which is rig-independent.
+
+And whenever you're ready: "figure out how to use your API and call you instead" is very doable — Anthropic's API is a near drop-in for this architecture. The _ai_step function is the only real integration point; swapping it to call Claude is a contained change whenever you want to go 

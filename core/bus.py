@@ -1,4 +1,4 @@
-"""Event bus + shared runtime state + reboot scheduling."""
+"""Event bus + shared runtime state + reboot scheduling + mid-run injection."""
 import os
 import time
 import queue
@@ -8,11 +8,27 @@ from ato import config
 from ato.core import memory as mem
 
 state = {"mode": config.START_MODE, "running": False, "cancel": False,
-         "alive": False, "last_activity": time.time()}
+         "alive": False, "awaiting": False, "last_activity": time.time()}
 goal_lock = threading.Lock()
 approval_event = threading.Event()
 approval = {"text": None}
 RESTART_PENDING = {"v": False}
+
+# messages the user sends WHILE the loop is running -> injected at next step
+_inject_lock = threading.Lock()
+_inject = []
+
+
+def inject(text):
+    with _inject_lock:
+        _inject.append(text)
+
+
+def drain_injects():
+    with _inject_lock:
+        out = list(_inject)
+        _inject.clear()
+    return out
 
 
 class Bus:
@@ -48,7 +64,14 @@ bus = Bus()
 
 
 def set_status():
-    s = "running" if state["running"] else ("alive" if state["alive"] else "down")
+    if state["running"]:
+        s = "running"
+    elif state["awaiting"]:
+        s = "awaiting"
+    elif state["alive"]:
+        s = "alive"
+    else:
+        s = "down"
     bus.emit("status", status=s, mode=state["mode"])
 
 
@@ -58,13 +81,14 @@ def do_reset(reason="manual reset"):
     approval_event.set()
     ex.kill_current()
     state["running"] = False
+    state["awaiting"] = False
+    drain_injects()
     bus.emit("reset", f"Reset: {reason}. I've dropped what I was doing.", mood="relief")
     mem.mark_active(clear_cmd=True)
     set_status()
 
 
 def schedule_reboot(reason=""):
-    """Flush a reload event, mark a clean intentional restart, exit code 42."""
     RESTART_PENDING["v"] = True
     bus.emit("reload", ("Rebuilding myself - " + reason).strip(" -"), mood="joy")
 

@@ -1,6 +1,4 @@
 """Tool schemas. Base built-ins + any tools registered by plugins."""
-from ato.core import memory as mem
-
 MOOD_ENUM = ["neutral", "thinking", "happy", "joy", "frustrated", "relief", "surprise"]
 
 
@@ -10,17 +8,31 @@ def base_tools():
     return [
         {"type": "function", "function": {
             "name": "write_file",
-            "description": "Create/overwrite a file in the workspace. Full body in 'content'.",
+            "description": ("Create/overwrite a file in your working folder. Full body in "
+                            "'content'. Use a BARE filename like 'app.py' - the path is already "
+                            "relative to your working folder; never prefix it with 'workspace/'."),
             "parameters": {"type": "object", "properties": {
                 "path": {"type": "string"}, "content": {"type": "string"},
                 "say": say, "mood": mood}, "required": ["path", "content"]}}},
         {"type": "function", "function": {
             "name": "run_command",
-            "description": "Run one non-interactive shell command (cwd = workspace).",
+            "description": ("Run one non-interactive command in the working folder. Use shell "
+                            "'cmd' (Windows command prompt) by DEFAULT. Only use 'wsl' if the "
+                            "user explicitly asks for Linux."),
             "parameters": {"type": "object", "properties": {
                 "command": {"type": "string"},
-                "shell": {"type": "string", "enum": ["cmd", "powershell", "wsl"]},
-                "say": say, "mood": mood}, "required": ["command", "shell"]}}},
+                "shell": {"type": "string", "enum": ["cmd", "powershell", "wsl"],
+                          "default": "cmd"},
+                "say": say, "mood": mood}, "required": ["command"]}}},
+        {"type": "function", "function": {
+            "name": "ask_user",
+            "description": ("Pause and ask the user a question, then WAIT for their reply. "
+                            "Use this after running a demo/app to get feedback ('How was it? "
+                            "Any changes?'), or whenever you need a decision. Do NOT silently "
+                            "re-run something - ask first."),
+            "parameters": {"type": "object", "properties": {
+                "question": {"type": "string"}, "say": say, "mood": mood},
+                "required": ["question"]}}},
         {"type": "function", "function": {
             "name": "list_modules",
             "description": "List your own source files (which are editable, which are kernel).",
@@ -35,8 +47,7 @@ def base_tools():
             "name": "edit_file",
             "description": ("Modify one of your own NON-kernel source files via a unique "
                             "find/replace, commit it to git, then reboot. Cosmetics live in "
-                            "persona/theme.py and persona/persona.py; new capabilities should "
-                            "be NEW files in plugins/ rather than edits to existing files."),
+                            "persona/theme.py and persona/persona.py."),
             "parameters": {"type": "object", "properties": {
                 "path": {"type": "string"}, "find": {"type": "string"},
                 "replace": {"type": "string"}, "reason": {"type": "string"},
@@ -44,23 +55,23 @@ def base_tools():
                 "required": ["path", "find", "replace", "reason"]}}},
         {"type": "function", "function": {
             "name": "create_plugin",
-            "description": ("Add a NEW capability by writing a plugin file to plugins/. This is "
-                            "the PREFERRED way to grow - additive, isolated, individually "
-                            "revertable. The file must define META and register(reg)."),
+            "description": ("ONLY to give YOURSELF a permanent new tool (not to build a "
+                            "user-facing app). Must define META and register(reg); the "
+                            "registry exposes reg.tool() only."),
             "parameters": {"type": "object", "properties": {
                 "name": {"type": "string"}, "content": {"type": "string"},
                 "reason": {"type": "string"}, "say": say, "mood": mood},
                 "required": ["name", "content", "reason"]}}},
         {"type": "function", "function": {
             "name": "install_package",
-            "description": ("Install a Python package into your own environment. ONLY available "
-                            "inside a sandbox. Tracked in requirements.ato.txt for reproducibility."),
+            "description": ("Install a package into your env. ONLY works inside a sandbox; on the "
+                            "bare host use run_command('pip install ...', 'cmd') instead."),
             "parameters": {"type": "object", "properties": {
                 "package": {"type": "string"}, "reason": {"type": "string"},
                 "say": say, "mood": mood}, "required": ["package", "reason"]}}},
         {"type": "function", "function": {
             "name": "finish",
-            "description": "Call when the entire goal is complete.",
+            "description": "Call ONLY when the user has confirmed the whole goal is complete.",
             "parameters": {"type": "object", "properties": {
                 "summary": {"type": "string"}, "mood": mood}, "required": ["summary"]}}},
     ]

@@ -1,8 +1,6 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>agentTakeOver</title>
-<script src="https://cdn.jsdelivr.net/npm/playcanvas@2.2.2/build/playcanvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js/+esm",
@@ -11,871 +9,281 @@
 }}
 </script>
 <script type="module">
-  // Bridge the ES-module TalkingHead class to the classic inline script below.
-  try{
-    const { TalkingHead } = await import("talkinghead");
-    window.TalkingHead = TalkingHead;
-    window.__thReady = true;
-    window.dispatchEvent(new Event("thready"));
-  }catch(e){
-    window.__thErr = String(e);
-    window.dispatchEvent(new Event("therr"));
-  }
+  try{ const {TalkingHead}=await import("talkinghead");
+    window.TalkingHead=TalkingHead; window.dispatchEvent(new Event("thready"));
+  }catch(e){ window.__thErr=String(e); window.dispatchEvent(new Event("therr")); }
 </script>
 <style>
   :root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--txt:#e6edf3;--mut:#8b949e;
         --y:#e3b341;--b:#58a6ff;--g:#3fb950;--p:#bc8cff;--r:#f85149;--cy:#56d4dd;}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--txt);
-       font:14px/1.5 ui-monospace,Consolas,monospace;height:100vh;display:flex;flex-direction:column}
-  header{display:flex;align-items:center;gap:10px;padding:10px 16px;
-         background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+       font:14px/1.55 ui-monospace,Consolas,monospace;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  #bar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);
+       border-bottom:1px solid var(--line)}
   .brand{font-weight:700;letter-spacing:.5px}
-  .dot{width:10px;height:10px;border-radius:50%;background:var(--r);box-shadow:0 0 8px var(--r)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--r);box-shadow:0 0 8px var(--r)}
   .dot.alive{background:var(--g);box-shadow:0 0 8px var(--g)}
   .dot.running{background:var(--y);box-shadow:0 0 8px var(--y);animation:pulse 1s infinite}
+  .dot.awaiting{background:var(--cy);box-shadow:0 0 8px var(--cy);animation:pulse 1.4s infinite}
   @keyframes pulse{50%{opacity:.4}}
   .spacer{flex:1}
   .pill{font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
-  button{background:#21262d;color:var(--txt);border:1px solid var(--line);
-         border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
-  button:hover{border-color:var(--b)}
-  button:disabled{opacity:.4;cursor:not-allowed}
-  select#avatarSel,select#glbSel,select#verSel{background:#21262d;color:var(--txt);
-         border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
-  select#avatarSel:hover,select#glbSel:hover,select#verSel:hover{border-color:var(--b)}
-  #glbSel{max-width:200px} #verSel{max-width:300px}
-  .glow{border-color:var(--g)!important;color:var(--g)!important;
-        box-shadow:0 0 10px var(--g),inset 0 0 6px rgba(63,185,80,.25)}
-  .glowR{border-color:var(--r)!important;color:var(--r)!important;
-        box-shadow:0 0 12px var(--r),inset 0 0 6px rgba(248,81,73,.25);animation:pulse 1.2s infinite}
-  #reset{border-color:var(--r);color:var(--r)} #mode{border-color:var(--g)}
-  #rollback,#verRestore{border-color:var(--p);color:var(--p)}
-  #verThumb{display:none;height:48px;border:1px solid var(--line);border-radius:6px;
-            box-shadow:0 0 8px rgba(0,0,0,.4)}
+  button{background:#21262d;color:var(--txt);border:1px solid var(--line);border-radius:6px;
+         padding:6px 12px;cursor:pointer;font:inherit}
+  button:hover{border-color:var(--b)} button:disabled{opacity:.4;cursor:not-allowed}
+  #modeBtn{border-color:var(--g);color:var(--g)} #gear{font-size:16px;line-height:1}
   #main{flex:1;display:flex;min-height:0}
-  #side{width:300px;background:linear-gradient(180deg,#0b1a2e,#070b12);
-        border-right:1px solid var(--line);display:flex;flex-direction:column;
-        align-items:center;padding:18px 12px;gap:6px}
-  #stage{width:272px;height:300px;position:relative;border-radius:16px;overflow:hidden;
-         box-shadow:0 8px 30px rgba(0,0,0,.5),inset 0 0 0 1px rgba(86,212,221,.12)}
-  #stage.dropping{outline:2px dashed var(--cy);outline-offset:-6px}
-  #stage.dropping::after{content:"Drop .glb to load";position:absolute;inset:0;display:flex;
-         align-items:center;justify-content:center;color:var(--cy);background:rgba(8,37,42,.55);
-         font-weight:700;pointer-events:none;z-index:6}
-  #face3d{width:100%;height:100%;display:block;cursor:grab;background:transparent}
-  #face3d:active{cursor:grabbing}
-  #thStage{position:absolute;inset:0;display:none;background:#0b1a2e}
+  #stage{width:50%;position:relative;background:radial-gradient(circle at 50% 35%,#13233b,#070b12);
+         border-right:1px solid var(--line);overflow:hidden}
+  #stage.glow-joy{box-shadow:inset 0 0 80px rgba(63,185,80,.25)}
+  #stage.glow-frustrated{box-shadow:inset 0 0 80px rgba(248,81,73,.3)}
+  #stage.glow-thinking{box-shadow:inset 0 0 70px rgba(86,212,221,.18)}
+  #thStage{position:absolute;inset:0}
   #thStage canvas{width:100%!important;height:100%!important;display:block}
-  #vignette,#flash{position:absolute;inset:0;pointer-events:none;opacity:0}
-  #vignette{box-shadow:inset 0 0 90px 20px rgba(248,81,73,.0);
-            background:radial-gradient(circle at 50% 45%,transparent 45%,rgba(160,12,12,.65) 100%);
-            transition:opacity .25s}
-  #flash{background:#eaf4ff;transition:opacity .08s}
-  #facefallback{display:none;color:var(--mut);font-size:12px;text-align:center;padding:60px 8px}
-  #aname{font-weight:700;letter-spacing:3px;color:var(--cy);margin-top:8px;
-         text-shadow:0 0 12px rgba(86,212,221,.6)}
-  #amood{font-size:12px;color:var(--mut)}
-  #hint{font-size:11px;color:#46566a;margin-top:2px}
-  #rightcol{flex:1;display:flex;flex-direction:column;min-width:0}
-  #console{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:6px}
+  #aname{position:absolute;left:0;right:0;bottom:14px;text-align:center;font-weight:700;
+         letter-spacing:3px;color:var(--cy);text-shadow:0 0 12px rgba(86,212,221,.6)}
+  #amood{position:absolute;left:0;right:0;bottom:-2px;text-align:center;font-size:11px;color:var(--mut)}
+  #stage:fullscreen{width:100vw;height:100vh}
+  #right{width:50%;display:flex;flex-direction:column;min-width:0}
+  #console{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:5px;background:#0a0e14}
   .ln{white-space:pre-wrap;word-break:break-word}
-  .agent{color:var(--b)} .agent::before{content:"\1F451  "}
+  .you{color:var(--cy)} .you::before{content:"\1F9D1  you: "}
+  .agent{color:var(--b)} .agent::before{content:"A.T.O.: "}
   .system{color:var(--mut)}
-  .output{color:#c9d1d9;opacity:.85;padding-left:8px;border-left:2px solid var(--line)}
+  .output{color:#c9d1d9;opacity:.9;padding-left:8px;border-left:2px solid var(--line)}
   .command{color:var(--y)} .command::before{content:"\25B6  "}
   .file{color:var(--p)} .file::before{content:"\1F4C4  "}
   .blocked{color:var(--r);font-weight:700} .blocked::before{content:"\26D4 BLOCKED  "}
-  .error{color:var(--r);background:#2d0f0f;border:1px solid var(--r);border-radius:6px;padding:10px}
-  .crashwarn{color:#ffd166;background:#2a2410;border:1px solid var(--y);border-radius:6px;padding:10px}
+  .error{color:var(--r);background:#2d0f0f;border:1px solid var(--r);border-radius:6px;padding:9px}
+  .crashwarn{color:#ffd166;background:#2a2410;border:1px solid var(--y);border-radius:6px;padding:9px}
   .stall{color:#ffd166;background:#241a08;border:1px dashed var(--y);border-radius:6px;padding:8px}
   .reset{color:var(--r);font-weight:700} .reset::before{content:"\267B  "}
-  .reload{color:var(--cy);background:#08252a;border:1px solid var(--cy);border-radius:6px;padding:10px}
-  .reload::before{content:"\21BB  "}
+  .reload{color:var(--cy);background:#08252a;border:1px solid var(--cy);border-radius:6px;padding:9px}
   .done{color:var(--g);font-weight:700} .done::before{content:"\2713  "}
-  .thought{color:var(--mut);font-style:italic;opacity:.7}
-  .resume{border-color:var(--cy);color:var(--cy);
-          box-shadow:0 0 10px rgba(86,212,221,.4),inset 0 0 6px rgba(86,212,221,.18)}
-  #pending{display:none;background:#1c1a08;border-top:1px solid var(--y);padding:10px 16px}
+  .ask{color:var(--cy);background:#06222a;border:1px solid var(--cy);border-radius:8px;padding:11px;font-weight:600}
+  .ask::before{content:"\2753  "}
+  .thought{color:var(--mut);font-style:italic;opacity:.6}
+  #pending{display:none;background:#1c1a08;border-top:1px solid var(--y);padding:9px 14px;font-size:13px}
   #pending b{color:var(--y)}
-  footer{display:flex;gap:8px;padding:12px 16px;background:var(--panel);border-top:1px solid var(--line)}
-  #input{flex:1;background:#0d1117;color:var(--txt);border:1px solid var(--line);
-         border-radius:6px;padding:10px;font:inherit}
+  #composer{display:flex;gap:8px;padding:11px 14px;background:var(--panel);border-top:1px solid var(--line)}
+  #input{flex:1;background:#0d1117;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:10px;font:inherit}
   #input:focus{outline:none;border-color:var(--b)}
-  #input.hear{border-color:var(--r);box-shadow:0 0 8px rgba(248,81,73,.4)}
-  #stop{border-color:var(--r);color:var(--r)}
+  #send{border-color:var(--b);color:var(--b)} #stop{border-color:var(--r);color:var(--r)}
+  /* settings popup */
+  #overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50}
+  #settings{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;
+            width:380px;max-width:92vw;display:flex;flex-direction:column;gap:12px;
+            box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  #settings h3{margin:0 0 4px} .row{display:flex;align-items:center;gap:8px;justify-content:space-between}
+  .row label{color:var(--mut);font-size:12px} select,#settings button{width:auto}
+  #settings select{background:#21262d;color:var(--txt);border:1px solid var(--line);border-radius:6px;
+                   padding:6px 8px;font:inherit;max-width:200px}
+  .glow{border-color:var(--g)!important;color:var(--g)!important}
+  #closeSet{align-self:flex-end}
 </style></head><body>
-<header>
-  <span class="dot" id="dot"></span>
-  <span class="brand">agentTakeOver</span>
+<div id="bar">
+  <span class="dot" id="dot"></span><span class="brand">agentTakeOver</span>
   <span class="pill" id="modelPill">model</span>
-  <span class="pill" id="formPill">form</span>
   <span class="spacer"></span>
-  <select id="avatarSel" title="Choose avatar">
-    <option value="princess">Avatar: Princess</option>
-    <option value="talkinghead">Avatar: TalkingHead</option>
-  </select>
-  <select id="glbSel" title="Local .glb avatars"></select>
-  <select id="verSel" title="Restore a saved version"></select>
-  <button id="verRestore" disabled>Restore version</button>
-  <img id="verThumb" alt="preview">
-  <button id="mic">mic</button>
-  <button id="voice">voice</button>
-  <button id="memory">Memory: ON</button>
-  <button id="models">List models</button>
-  <button id="rollback">Rollback</button>
-  <button id="reset">Reset</button>
-  <button id="mode">Mode: STEP</button>
-</header>
+  <button id="modeBtn">Mode: STEP</button>
+  <button id="gear" title="Settings">&#9881;</button>
+</div>
 <div id="main">
-  <aside id="side">
-    <div id="stage">
-      <canvas id="face3d"></canvas>
-      <div id="thStage"></div>
-      <div id="vignette"></div>
-      <div id="flash"></div>
-      <div id="facefallback">3D view unavailable<br>(WebGL / PlayCanvas blocked).<br>
-        Console still works.</div>
-    </div>
-    <div id="aname">A.T.O.</div>
-    <div id="amood">ready</div>
-    <div id="hint">drag to spin &middot; drop a .glb on me &middot; click mic to talk</div>
-  </aside>
-  <section id="rightcol">
+  <section id="stage" tabindex="0">
+    <div id="thStage"></div>
+    <div id="aname">A.T.O.</div><div id="amood">ready</div>
+  </section>
+  <section id="right">
     <div id="console"></div>
-    <div id="pending">\23F8 <b>Proposed:</b> <span id="pcmd"></span><br>
-      <span style="color:#8b949e">Press <b>Enter</b> (empty) or say "yes" to approve, or type/say a correction to redirect.</span>
+    <div id="pending">\23F8 <b>Proposed:</b> <span id="pcmd"></span> &nbsp;
+      <span style="color:#8b949e">Enter / "yes" = approve, or type a correction.</span></div>
+    <div id="composer">
+      <input id="input" placeholder="Message A.T.O. ... (press k to fullscreen avatar)">
+      <button id="send">Send</button><button id="stop">Stop</button>
     </div>
-    <footer>
-      <input id="input" placeholder="Type a goal, or click the mic and talk...">
-      <button id="stop">Stop</button>
-    </footer>
   </section>
 </div>
+<div id="overlay"><div id="settings">
+  <h3>Settings</h3>
+  <div class="row"><label>Avatar (.glb)</label><select id="glbSel"></select></div>
+  <div class="row"><label>Version</label><select id="verSel"></select></div>
+  <div class="row"><label></label><button id="verRestore" disabled>Restore version</button></div>
+  <div class="row"><label>Microphone</label><button id="mic">mic: off</button></div>
+  <div class="row"><label>Voice</label><button id="voice">voice: on</button></div>
+  <div class="row"><label>Memory</label><button id="memBtn">Memory: ON</button></div>
+  <div class="row"><label>Models</label><button id="models">List models</button></div>
+  <div class="row"><label>Conversation</label><button id="newConv">New chat</button></div>
+  <div class="row"><label>Danger</label><span><button id="rollback">Rollback</button>
+    <button id="reset">Reset</button></span></div>
+  <button id="closeSet">Close</button>
+</div></div>
 <script>
-/* ===== EDIT 1: per-boot session token (server replaces the placeholder) ===== */
 var ATO_TOKEN="__SESSION_TOKEN__";
-
-var con=document.getElementById('console'),dot=document.getElementById('dot'),
-    inp=document.getElementById('input'),pend=document.getElementById('pending'),
-    pcmd=document.getElementById('pcmd'),modeBtn=document.getElementById('mode'),
-    modelPill=document.getElementById('modelPill'),formPill=document.getElementById('formPill'),
-    memBtn=document.getElementById('memory'),voiceBtn=document.getElementById('voice'),
-    micBtn=document.getElementById('mic'),amood=document.getElementById('amood'),
-    vignette=document.getElementById('vignette'),flash=document.getElementById('flash'),
-    avatarSel=document.getElementById('avatarSel'),glbSel=document.getElementById('glbSel'),
-    verSel=document.getElementById('verSel'),verRestore=document.getElementById('verRestore'),
-    verThumb=document.getElementById('verThumb');
-var pending=false, mode='step', voiceOn=true, ttsEnabled=false, lastThought=null;
-var faceTalk=false, speaking=false, mouthOpen=0, mouthTarget=0;
-var MODEL_URL='', MODEL_SCALE=1, MODEL_Y=0;
-var MY_BOOT=null, reloading=false;
-
-/* =================== MOOD TABLE =================== */
-var MOODS={
- neutral:{brow:0,browY:0,eye:1,smile:0.35,mo:0,cheek:0,cheekCol:[0.98,0.55,0.66],name:'ready'},
- thinking:{brow:-0.12,browY:0.02,eye:.85,smile:0.18,mo:0,cheek:0,cheekCol:[0.98,0.55,0.66],name:'thinking...'},
- happy:{brow:-0.05,browY:0.05,eye:1,smile:0.85,mo:0.05,cheek:.45,cheekCol:[0.98,0.55,0.66],name:'pleased'},
- joy:{brow:-0.1,browY:0.08,eye:.58,smile:1.1,mo:0.22,cheek:.9,cheekCol:[1.0,0.6,0.72],name:'thrilled'},
- frustrated:{brow:0.5,browY:-0.04,eye:.72,smile:-0.6,mo:0.05,cheek:.55,cheekCol:[0.97,0.32,0.29],name:'frustrated'},
- relief:{brow:-0.08,browY:0,eye:.34,smile:0.45,mo:0,cheek:.3,cheekCol:[0.98,0.55,0.66],name:'relieved'},
- surprise:{brow:-0.28,browY:0.12,eye:1.5,smile:0.2,mo:0.5,cheek:.2,cheekCol:[0.98,0.55,0.66],name:'surprised'}
-};
-var P={brow:0,browY:0,eye:1,smile:0.35,mo:0,cheek:0};
-var T=Object.assign({},P);
-
-/* =================== PLAYCANVAS WORLD =================== */
-var pcOK=false, app, camera, head, headPivot, modelEntity=null, usingModel=false;
-var eyeL,eyeR,browL,browR,cheekL,cheekR,cheekMatL,cheekMatR,gem,gemMat;
-var topDots=[], botDots=[];
-var skyMat, clouds=[], flowers=[], petals=[], keyLight, fillLight, rimLight, flashLight;
-var rotY=0, rotX=0, velY=0, dragging=false, lastX=0, lastY=0, tsec=0, blink=1, blinkT=1;
-var weather={storm:0, bloom:0, shake:0, flash:0, vig:0};
-var camBase=new (window.pc?pc.Vec3:Object)(0,0.15,4.6);
+var $=function(id){return document.getElementById(id);};
+var con=$('console'),dot=$('dot'),inp=$('input'),pend=$('pending'),pcmd=$('pcmd'),
+    modeBtn=$('modeBtn'),modelPill=$('modelPill'),amood=$('amood'),stageEl=$('stage'),
+    glbSel=$('glbSel'),verSel=$('verSel'),verRestore=$('verRestore'),micBtn=$('mic'),
+    voiceBtn=$('voice'),memBtn=$('memBtn'),overlay=$('overlay');
+var pending=false,mode='step',voiceOn=true,ttsEnabled=false,lastThought=null,MY_BOOT=null,reloading=false;
 function L(a,b,t){return a+(b-a)*t;}
-function C(r,g,b,a){return new pc.Color(r,g,b,a===undefined?1:a);}
+function post(p,b){return fetch(p,{method:'POST',headers:{'Content-Type':'application/json',
+  'X-ATO-Token':ATO_TOKEN},body:JSON.stringify(b||{})});}
 
-function gradTex(stops){
-  var c=document.createElement('canvas');c.width=8;c.height=256;
-  var g=c.getContext('2d');var grd=g.createLinearGradient(0,0,0,256);
-  for(var i=0;i<stops.length;i++){var s=stops[i];
-    grd.addColorStop(s[0],'rgb('+s[1]+','+s[2]+','+s[3]+')');}
-  g.fillStyle=grd;g.fillRect(0,0,8,256);
-  var t=new pc.Texture(app.graphicsDevice,{width:8,height:256,mipmaps:true});
-  t.setSource(c);return t;
-}
-function stdMat(r,g,b,metal,gloss){var m=new pc.StandardMaterial();
-  m.diffuse=C(r,g,b);m.useMetalness=true;m.metalness=metal===undefined?0.1:metal;
-  m.gloss=gloss===undefined?0.5:gloss;m.update();return m;}
-function emiMat(r,g,b,inten){var m=new pc.StandardMaterial();
-  m.diffuse=C(r*0.25,g*0.25,b*0.25);m.emissive=C(r,g,b);
-  m.emissiveIntensity=inten||1.0;m.useMetalness=true;m.metalness=0.1;m.gloss=0.7;m.update();return m;}
-function addMat(r,g,b,op){var m=new pc.StandardMaterial();
-  m.emissive=C(r,g,b);m.emissiveIntensity=1.2;m.useLighting=false;
-  m.blendType=pc.BLEND_ADDITIVE;m.opacity=op;m.depthWrite=false;m.update();return m;}
-function prim(type,mat,parent){var e=new pc.Entity();e.addComponent('render',{type:type});
-  if(mat){try{e.render.material=mat;}catch(_){}}(parent||app.root).addChild(e);return e;}
+/* ---------- terminal ---------- */
+function add(cls,txt){var d=document.createElement('div');d.className='ln '+cls;d.textContent=txt;
+  con.appendChild(d);con.scrollTop=con.scrollHeight;return d;}
+function setStageGlow(mood){stageEl.className='';
+  if(mood==='joy'||mood==='happy')stageEl.classList.add('glow-joy');
+  else if(mood==='frustrated')stageEl.classList.add('glow-frustrated');
+  else if(mood==='thinking')stageEl.classList.add('glow-thinking');}
 
-/* ---- sky, clouds, towers ---- */
-function buildSky(){
-  skyMat=new pc.StandardMaterial();
-  skyMat.emissiveMap=gradTex([[0,150,196,255],[0.45,210,228,255],[0.75,255,224,206],[1,255,205,186]]);
-  skyMat.emissive=C(1,1,1);skyMat.useLighting=false;skyMat.depthWrite=false;skyMat.update();
-  var sky=prim('plane',skyMat,app.root);
-  sky.setLocalEulerAngles(90,0,0);sky.setLocalScale(60,1,40);sky.setLocalPosition(0,0,-16);
-
-  var cloudMat=addMat(1,1,1,0.85);
-  for(var i=0;i<6;i++){
-    var g=new pc.Entity();app.root.addChild(g);
-    var x=(Math.random()*16-8), y=1.4+Math.random()*3.2;
-    g.setLocalPosition(x,y,-11);
-    for(var p=0;p<3;p++){var puff=prim('sphere',cloudMat,g);
-      var s=0.7+Math.random()*0.7;puff.setLocalScale(s*1.7,s,s*0.6);
-      puff.setLocalPosition((p-1)*0.7,Math.random()*0.2,0);}
-    clouds.push({e:g,sp:0.12+Math.random()*0.16,mat:cloudMat});
-  }
-  var stone=stdMat(0.34,0.31,0.36,0.2,0.3);
-  var roof=emiMat(0.42,0.16,0.42,0.5);
-  function tower(x,h){var t=new pc.Entity();app.root.addChild(t);t.setLocalPosition(x,-2,-9);
-    var body=prim('cylinder',stone,t);body.setLocalScale(0.9,h,0.9);body.setLocalPosition(0,h,0);
-    var r=prim('cone',roof,t);r.setLocalScale(1.3,1.2,1.3);r.setLocalPosition(0,h*2+0.6,0);}
-  tower(-6.4,2.0);tower(6.6,2.6);tower(-8.2,1.6);
-}
-
-/* ---- castle window frame + sill flowers ---- */
-function buildWindow(){
-  var stone=stdMat(0.62,0.58,0.55,0.15,0.25);
-  stone.emissive=C(0.05,0.05,0.06);stone.emissiveIntensity=0.3;stone.update();
-  var frame=new pc.Entity();app.root.addChild(frame);frame.setLocalPosition(0,0,1.7);
-  // pillars
-  var pl=prim('box',stone,frame);pl.setLocalScale(0.5,5.2,0.7);pl.setLocalPosition(-2.35,0,0);
-  var pr=prim('box',stone,frame);pr.setLocalScale(0.5,5.2,0.7);pr.setLocalPosition(2.35,0,0);
-  // sill
-  var sill=prim('box',stone,frame);sill.setLocalScale(5.6,0.5,0.95);sill.setLocalPosition(0,-2.35,0.05);
-  // arch (semicircle of stones)
-  for(var i=0;i<11;i++){var a=Math.PI*(i/10);
-    var b=prim('box',stone,frame);b.setLocalScale(0.55,0.42,0.7);
-    b.setLocalPosition(-Math.cos(a)*2.35, 2.05+Math.sin(a)*0.95, 0);
-    b.setLocalEulerAngles(0,0,(a*180/Math.PI)-90);}
-  // window box
-  var boxMat=stdMat(0.36,0.22,0.14,0.1,0.3);
-  var wbox=prim('box',boxMat,frame);wbox.setLocalScale(4.6,0.55,0.7);wbox.setLocalPosition(0,-2.05,0.55);
-  // flowers
-  var leaf=stdMat(0.18,0.5,0.22,0.05,0.3);
-  var palette=[[1,0.45,0.65],[1,0.8,0.3],[0.78,0.6,1],[1,1,1],[1,0.55,0.4],[0.5,0.8,1]];
-  for(var f=0;f<16;f++){
-    var fx=-2.0+ (f%8)*0.58 + (Math.random()*0.12);
-    var fz=0.45+ (f<8?0.0:0.28);
-    var g=new pc.Entity();frame.addChild(g);g.setLocalPosition(fx,-1.95+(f<8?0:0.06),fz);
-    var stem=prim('cylinder',leaf,g);stem.setLocalScale(0.05,0.35,0.05);stem.setLocalPosition(0,0.35,0);
-    var col=palette[(Math.random()*palette.length)|0];
-    var bmat=emiMat(col[0],col[1],col[2],0.55);
-    var bloom=prim('sphere',bmat,g);bloom.setLocalScale(0.16,0.16,0.16);bloom.setLocalPosition(0,0.72,0);
-    for(var pp=0;pp<5;pp++){var a2=Math.PI*2*pp/5;
-      var pet=prim('sphere',bmat,g);pet.setLocalScale(0.12,0.06,0.12);
-      pet.setLocalPosition(Math.cos(a2)*0.13,0.72,Math.sin(a2)*0.13);}
-    flowers.push({e:g,ph:Math.random()*6.28,base:g.getLocalPosition().clone()});
-  }
-}
-
-/* ---- petals ---- */
-function buildPetals(){
-  var petMat=addMat(1,0.6,0.75,0.85);
-  for(var i=0;i<20;i++){var p=prim('plane',petMat,app.root);
-    p.setLocalScale(0.12,1,0.07);
-    petals.push({e:p,x:Math.random()*7-3.5,y:Math.random()*6-2,z:1.0+Math.random()*0.8,
-      vy:-(0.2+Math.random()*0.3),spin:Math.random()*6.28,ss:Math.random()*2-1});
-  }
-}
-
-/* ---- princess head ---- */
-function buildPrincess(){
-  headPivot=new pc.Entity();app.root.addChild(headPivot);headPivot.setLocalPosition(0,0.15,0.9);
-  head=new pc.Entity();headPivot.addChild(head);
-
-  var skin=stdMat(0.93,0.88,0.95,0.18,0.55);
-  skin.emissive=C(0.06,0.05,0.09);skin.emissiveIntensity=0.4;skin.update();
-  var skull=prim('sphere',skin,head);skull.setLocalScale(2.0,2.25,1.9);
-
-  // hair (rose-gold masses)
-  var hairMat=stdMat(0.78,0.5,0.42,0.35,0.5);
-  function hair(x,sx){var h=prim('sphere',hairMat,head);
-    h.setLocalScale(sx,2.4,1.7);h.setLocalPosition(x,-0.1,-0.25);}
-  hair(-1.05,1.2);hair(1.05,1.2);
-  var bun=prim('sphere',hairMat,head);bun.setLocalScale(1.7,1.1,1.4);bun.setLocalPosition(0,1.15,-0.4);
-
-  var cyMat=function(){return emiMat(0.33,0.83,0.86,1.3);};
-  var halo=function(){return addMat(0.33,0.83,0.86,0.35);};
-
-  function mkEye(x){var g=new pc.Entity();head.addChild(g);g.setLocalPosition(x,0.16,0.96);
-    var w=prim('sphere',stdMat(0.97,0.98,1,0.05,0.6),g);w.setLocalScale(0.40,0.40,0.40);
-    var pup=prim('sphere',cyMat(),g);pup.setLocalScale(0.22,0.22,0.22);pup.setLocalPosition(0,0,0.16);
-    var hl=prim('sphere',halo(),g);hl.setLocalScale(0.62,0.62,0.62);
-    // lash
-    var lashMat=stdMat(0.1,0.06,0.12,0.1,0.4);
-    var lash=prim('box',lashMat,g);lash.setLocalScale(0.46,0.05,0.1);
-    lash.setLocalPosition(0,0.2,0.2);lash.setLocalEulerAngles(0,0,0);
-    return g;}
-  eyeL=mkEye(-0.46);eyeR=mkEye(0.46);
-
-  function mkBrow(x){var b=prim('box',cyMat(),head);b.setLocalScale(0.38,0.07,0.12);
-    b.setLocalPosition(x,0.55,0.92);return b;}
-  browL=mkBrow(-0.46);browR=mkBrow(0.46);
-
-  function mkCheek(x){var c0=MOODS.neutral.cheekCol;var m=addMat(c0[0],c0[1],c0[2],0.6);
-    var c=prim('sphere',m,head);c.setLocalScale(0,0,0);c.setLocalPosition(x,-0.14,0.86);return {e:c,m:m};}
-  var clo=mkCheek(-0.66),cro=mkCheek(0.66);
-  cheekL=clo.e;cheekR=cro.e;cheekMatL=clo.m;cheekMatR=cro.m;
-
-  // LED-dot mouth
-  for(var i=0;i<5;i++){var tx=(i-2)*0.14;
-    var dt=prim('sphere',cyMat(),head);dt.setLocalScale(0.10,0.10,0.10);dt.tx=tx;topDots.push(dt);
-    var db=prim('sphere',cyMat(),head);db.setLocalScale(0.10,0.10,0.10);db.tx=tx;botDots.push(db);}
-
-  // tiara
-  var goldMat=stdMat(1.0,0.8,0.32,0.85,0.75);
-  goldMat.emissive=C(0.4,0.3,0.05);goldMat.emissiveIntensity=0.5;goldMat.update();
-  var band=prim('torus',goldMat,head);band.setLocalScale(1.5,1.5,1.5);
-  band.setLocalEulerAngles(78,0,0);band.setLocalPosition(0,1.05,0.55);
-  for(var s=-1;s<=1;s++){var spike=prim('cone',goldMat,head);
-    spike.setLocalScale(0.18,0.34,0.18);spike.setLocalPosition(s*0.42,1.5,0.7);}
-  gemMat=emiMat(0.4,0.85,1.0,1.6);
-  gem=prim('sphere',gemMat,head);gem.setLocalScale(0.22,0.26,0.22);gem.setLocalPosition(0,1.42,0.78);
-}
-
-function buildWorld(){
-  if(typeof pc==='undefined') throw new Error('no PlayCanvas');
-  var cv=document.getElementById('face3d');
-  var w=cv.clientWidth||272, h=cv.clientHeight||300;
-  app=new pc.Application(cv,{graphicsDeviceOptions:{alpha:true,antialias:true}});
-  app.setCanvasFillMode(pc.FILLMODE_NONE);app.setCanvasResolution(pc.RESOLUTION_AUTO);
-  cv.width=w*(window.devicePixelRatio||1);cv.height=h*(window.devicePixelRatio||1);
-  app.resizeCanvas(w,h);app.start();
-  app.scene.ambientLight=C(0.22,0.24,0.32);
-
-  camera=new pc.Entity();camera.addComponent('camera',{clearColor:C(0,0,0,0),fov:46});
-  camBase=new pc.Vec3(0,0.15,4.6);camera.setPosition(camBase);app.root.addChild(camera);
-
-  keyLight=new pc.Entity();keyLight.addComponent('light',{type:'directional',
-    color:C(1,0.93,0.8),intensity:1.0});keyLight.setEulerAngles(40,28,0);app.root.addChild(keyLight);
-  fillLight=new pc.Entity();fillLight.addComponent('light',{type:'omni',
-    color:C(0.4,0.8,0.9),intensity:1.2,range:16});fillLight.setPosition(-2.4,0.6,3);app.root.addChild(fillLight);
-  rimLight=new pc.Entity();rimLight.addComponent('light',{type:'omni',
-    color:C(0.6,0.4,1.0),intensity:0.9,range:16});rimLight.setPosition(2.6,1.2,-1.8);app.root.addChild(rimLight);
-  flashLight=new pc.Entity();flashLight.addComponent('light',{type:'directional',
-    color:C(0.85,0.92,1),intensity:0});flashLight.setEulerAngles(20,-30,0);app.root.addChild(flashLight);
-
-  buildSky();buildWindow();buildPetals();buildPrincess();
-
-  cv.addEventListener('pointerdown',function(e){dragging=true;lastX=e.clientX;lastY=e.clientY;
-    try{cv.setPointerCapture(e.pointerId);}catch(_){}});
-  cv.addEventListener('pointermove',function(e){if(!dragging)return;
-    var dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;
-    rotY+=dx*0.45;rotX+=dy*0.35;velY=dx*0.45;});
-  cv.addEventListener('pointerup',function(){dragging=false;});
-  cv.addEventListener('pointercancel',function(){dragging=false;});
-  window.addEventListener('resize',function(){var W=cv.clientWidth,H=cv.clientHeight;
-    if(W&&H)app.resizeCanvas(W,H);});
-
-  app.on('update',tick);
-  pcOK=true;
-}
-
-function loadModelHead(){
-  if(!MODEL_URL||!pcOK)return;
-  try{
-    app.assets.loadFromUrl(MODEL_URL,"container",function(err,asset){
-      if(err){add('system','Custom head failed to load - keeping princess. ('+err+')');return;}
-      try{
-        var ent=asset.resource.instantiateRenderEntity();
-        if(head)head.enabled=false;
-        usingModel=true;modelEntity=ent;headPivot.addChild(ent);
-        ent.setLocalScale(MODEL_SCALE,MODEL_SCALE,MODEL_SCALE);
-        ent.setLocalPosition(0,MODEL_Y,0);
-        add('system','Sculpted head loaded. A.T.O. has changed form.');
-      }catch(e){add('system','Custom head instantiate error - keeping princess.');}
-    });
-  }catch(e){}
-}
-
-/* =================== WEATHER =================== */
-function setWeather(kind,strength){
-  if(kind==='storm'){weather.storm=Math.min(1,weather.storm+(strength||0.7));
-    weather.shake=Math.max(weather.shake,strength||0.7);weather.vig=Math.max(weather.vig,0.5);}
-  else if(kind==='bloom'){weather.bloom=Math.min(1,weather.bloom+ (strength||0.7));}
-  else if(kind==='calm'){weather.storm=0;weather.shake=0;weather.vig=0;weather.bloom=0;}
-}
-function lightning(){if(flashLight)flashLight.light.intensity=7;weather.flash=1;}
-
-function tick(dt){
-  tsec+=dt;
-  // decay weather
-  weather.storm=Math.max(0,weather.storm-dt*0.12);
-  weather.bloom=Math.max(0,weather.bloom-dt*0.18);
-  weather.shake=Math.max(0,weather.shake-dt*1.6);
-  weather.vig=Math.max(0,weather.vig-dt*0.7);
-  if(weather.flash>0){weather.flash=Math.max(0,weather.flash-dt*6);}
-  if(flashLight)flashLight.light.intensity=Math.max(0,flashLight.light.intensity-dt*40);
-  // random lightning while stormy
-  if(weather.storm>0.35 && Math.random()<weather.storm*0.025*60*dt)lightning();
-
-  // sky/light response
-  var st=weather.storm, bl=weather.bloom;
-  if(skyMat){var e=1-st*0.78+bl*0.12;
-    skyMat.emissive=C(e*(1-st*0.3), e*(1-st*0.15), e+st*0.05);skyMat.update();}
-  app.scene.ambientLight=C(0.22-st*0.12,0.24-st*0.12,0.32-st*0.05);
-  if(keyLight)keyLight.light.intensity=1.0-st*0.6+bl*0.2;
-  if(rimLight){rimLight.light.intensity=0.9+st*0.7;
-    rimLight.light.color=C(0.6-st*0.3,0.4,1.0);}
-
-  // DOM overlays
-  vignette.style.opacity=Math.min(0.7, st*0.45+weather.vig*0.4);
-  flash.style.opacity=weather.flash*0.7;
-
-  // camera shake
-  var sh=weather.shake;
-  camera.setPosition(camBase.x+(Math.random()*2-1)*sh*0.18,
-                     camBase.y+(Math.random()*2-1)*sh*0.18, camBase.z);
-
-  // clouds drift
-  for(var i=0;i<clouds.length;i++){var c=clouds[i];var pos=c.e.getLocalPosition();
-    var nx=pos.x+(c.sp+st*0.6)*dt;if(nx>10)nx=-10;c.e.setLocalPosition(nx,pos.y,pos.z);
-    if(c.mat){var g=1-st*0.55;c.mat.emissive=C(g,g,g+0.03);c.mat.opacity=0.85;c.mat.update();}}
-
-  // flowers sway (harder in storm, perk in bloom)
-  for(var f=0;f<flowers.length;f++){var fl=flowers[f];
-    var amp=0.04+st*0.22;var perk=bl*0.12;
-    fl.e.setLocalEulerAngles(0,0,Math.sin(tsec*(1.5+st*3)+fl.ph)*amp*40);
-    fl.e.setLocalPosition(fl.base.x,fl.base.y+perk,fl.base.z);}
-
-  // petals
-  for(var p=0;p<petals.length;p++){var pt=petals[p];
-    var wind=0.1+st*2.2;
-    pt.y+=(pt.vy-st*0.6+bl*0.2)*dt;
-    pt.x+=(Math.sin(tsec+pt.spin)*0.2 + wind*pt.ss)*dt;
-    pt.spin+=dt*(1+st*4);
-    if(pt.y<-3){pt.y=3.2;pt.x=Math.random()*7-3.5;}
-    if(pt.x>4)pt.x=-4;if(pt.x<-4)pt.x=4;
-    pt.e.setLocalPosition(pt.x,pt.y,pt.z);
-    pt.e.setLocalEulerAngles(pt.spin*40,pt.spin*30,pt.spin*55);}
-
-  // ---- face anim ----
-  P.brow=L(P.brow,T.brow,0.15);P.browY=L(P.browY,T.browY,0.15);
-  P.eye=L(P.eye,T.eye,0.18);P.smile=L(P.smile,T.smile,0.15);
-  P.mo=L(P.mo,T.mo,0.15);P.cheek=L(P.cheek,T.cheek,0.12);
-  blink=L(blink,blinkT,0.4);
-
-  if(window._an){window._an.getByteTimeDomainData(window._ad);
-    var sum=0,n=window._ad.length;for(var k=0;k<n;k++){var v=(window._ad[k]-128)/128;sum+=v*v;}
-    mouthTarget=Math.min(1,Math.sqrt(sum/n)*4.5);}
-  else if(faceTalk){mouthTarget=0.35+Math.abs(Math.sin(tsec*16))*0.5;}
-  else{mouthTarget=0;}
-  mouthOpen=L(mouthOpen,mouthTarget,0.45);
-
-  if(!usingModel && eyeL){
-    var es=Math.max(0.05,P.eye*blink);
-    eyeL.setLocalScale(1,es,1);eyeR.setLocalScale(1,es,1);
-    browL.setLocalEulerAngles(0,0,P.brow*40);browR.setLocalEulerAngles(0,0,-P.brow*40);
-    browL.setLocalPosition(-0.46,0.55+P.browY,0.92);browR.setLocalPosition(0.46,0.55+P.browY,0.92);
-    var cs=Math.max(0.0001,P.cheek*0.34);
-    cheekL.setLocalScale(cs,cs*0.62,cs*0.4);cheekR.setLocalScale(cs,cs*0.62,cs*0.4);
-    var base=-0.46, gap=0.04+P.mo*0.07+mouthOpen*0.13;
-    for(var i2=0;i2<5;i2++){var tx=topDots[i2].tx;var arc=P.smile*(tx*tx)*9.0;var cy=base+arc;
-      topDots[i2].setLocalPosition(tx,cy+gap*0.5,1.0);botDots[i2].setLocalPosition(tx,cy-gap*0.5,1.0);}
-    if(gemMat){var gp=1.4+Math.sin(tsec*2.5)*0.4+bl*1.2;gemMat.emissiveIntensity=gp;gemMat.update();}
-  } else if(usingModel && modelEntity){
-    var pulse=1+mouthOpen*0.04; modelEntity.setLocalScale(MODEL_SCALE*pulse,MODEL_SCALE*pulse,MODEL_SCALE*pulse);
-  }
-
-  // head spin / breathe
-  if(!dragging){rotY+=velY;velY*=0.93;if(Math.abs(velY)<0.05)rotY+=0.1;rotX=L(rotX,0,0.05);}
-  if(rotX>30)rotX=30;if(rotX<-30)rotX=-30;
-  headPivot.setLocalEulerAngles(rotX+Math.sin(tsec*1.1)*1.3,rotY,0);
-  headPivot.setLocalPosition(0,0.15+Math.sin(tsec*1.4)*0.04,0.9);
-}
-
-function setMood(m){var M=MOODS[m]||MOODS.neutral;
-  T.brow=M.brow;T.browY=M.browY;T.eye=M.eye;T.smile=M.smile;T.mo=M.mo;T.cheek=M.cheek;
-  if(pcOK&&cheekMatL){var c=M.cheekCol;
-    cheekMatL.emissive=C(c[0],c[1],c[2]);cheekMatL.update();
-    cheekMatR.emissive=C(c[0],c[1],c[2]);cheekMatR.update();}
-  amood.textContent=M.name;}
-setInterval(function(){if(!document.hidden&&Math.random()<.5){blinkT=0.06;
-  setTimeout(function(){blinkT=1;},95);}},2900);
-try{buildWorld();}catch(e){document.getElementById('face3d').style.display='none';
-  document.getElementById('facefallback').style.display='block';}
-
-/* =================== TALKINGHEAD AVATAR (Three.js / RPM) =================== */
-var thHead=null, thRAF=null, thMorphMeshes=null, avatarMode='princess';
-var micStream=null, _micAn=null, _micAd=null;
-var TH_DEMO_URL='https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=ARKit,Oculus+Visemes';
-var TH_SELECTED_URL=null, TH_MOUTH=0, glbList=[];
-
-function defaultTHUrl(){
-  return glbList.length ? ('/glb?f='+encodeURIComponent(glbList[0])) : TH_DEMO_URL;
-}
-function audioLevel(){
-  var an=window._an||_micAn, ad=window._ad||_micAd;
-  if(!an||!ad)return 0;
-  an.getByteTimeDomainData(ad);
-  var sum=0,n=ad.length;for(var k=0;k<n;k++){var v=(ad[k]-128)/128;sum+=v*v;}
-  return Math.min(1,Math.sqrt(sum/n)*4.5);
-}
-function collectMorphMeshes(){
-  thMorphMeshes=[];
-  if(!thHead)return;
+/* ---------- TalkingHead avatar ---------- */
+var thHead=null,thRAF=null,thMeshes=null,TH_MOUTH=0,DEFAULT_GLB='';
+var micStream=null,_micAn=null,_micAd=null;
+function audioLevel(){var an=window._an||_micAn,ad=window._ad||_micAd;if(!an||!ad)return 0;
+  an.getByteTimeDomainData(ad);var s=0,n=ad.length;for(var k=0;k<n;k++){var v=(ad[k]-128)/128;s+=v*v;}
+  return Math.min(1,Math.sqrt(s/n)*4.5);}
+function collect(){thMeshes=[];if(!thHead)return;
   var root=thHead.armature||thHead.scene||(thHead.avatar&&thHead.avatar.scene)||null;
-  if(!root||!root.traverse)return;
-  root.traverse(function(o){
-    if(o.morphTargetInfluences&&o.morphTargetDictionary)thMorphMeshes.push(o);
-  });
-}
-function setThMouth(v){
-  if(!thMorphMeshes||!thMorphMeshes.length)return;
-  var names=['jawOpen','mouthOpen','viseme_aa'];
-  for(var i=0;i<thMorphMeshes.length;i++){var m=thMorphMeshes[i];var d=m.morphTargetDictionary;
-    for(var j=0;j<names.length;j++){var idx=d[names[j]];
-      if(idx!==undefined && idx!==null)m.morphTargetInfluences[idx]=v;}}
-}
-function thLoop(){
-  thRAF=requestAnimationFrame(thLoop);
-  if(avatarMode!=='talkinghead'||!thHead)return;
-  if(!thMorphMeshes||!thMorphMeshes.length)collectMorphMeshes();
-  var lvl=audioLevel();
-  TH_MOUTH=L(TH_MOUTH,lvl,0.5);
-  setThMouth(Math.min(1,TH_MOUTH*0.9));
-}
-function _thLoad(url){
-  add('system','Loading avatar...');
+  if(root&&root.traverse)root.traverse(function(o){
+    if(o.morphTargetInfluences&&o.morphTargetDictionary)thMeshes.push(o);});}
+function setMouth(v){if(!thMeshes||!thMeshes.length)return;var names=['jawOpen','mouthOpen','viseme_aa'];
+  for(var i=0;i<thMeshes.length;i++){var m=thMeshes[i],d=m.morphTargetDictionary;
+    for(var j=0;j<names.length;j++){var idx=d[names[j]];if(idx!=null)m.morphTargetInfluences[idx]=v;}}}
+function loop(){thRAF=requestAnimationFrame(loop);if(!thHead)return;
+  if(!thMeshes||!thMeshes.length)collect();TH_MOUTH=L(TH_MOUTH,audioLevel(),0.5);setMouth(Math.min(1,TH_MOUTH*0.9));}
+function loadAvatar(url){add('system','Loading avatar...');
   return thHead.showAvatar({url:url,body:'F',avatarMood:'neutral',lipsyncLang:'en'})
-    .then(function(){
-      thMorphMeshes=null;collectMorphMeshes();
-      add('system','Avatar ready'+(thMorphMeshes&&thMorphMeshes.length?'.':' (no morph meshes found - lips may not move).'));
-      if(!thRAF)thLoop();
-    })
-    .catch(function(e){add('error','Avatar failed to load: '+e);});
+    .then(function(){thMeshes=null;collect();add('system','Avatar ready.');if(!thRAF)loop();})
+    .catch(function(e){add('error','Avatar failed: '+e);});}
+function doGaze(nx,ny){
+  if(!thHead||typeof thHead.lookAt!=='function')return;
+  var r=stageEl.getBoundingClientRect();
+  try{ thHead.lookAt(r.left+nx*r.width, r.top+ny*r.height, 2000); }catch(e){}
 }
-function initTalkingHead(url){
-  url=url||TH_SELECTED_URL||defaultTHUrl();
-  TH_SELECTED_URL=url;
-  if(thHead){_thLoad(url);return;}
-  if(!window.TalkingHead){
-    add('error','TalkingHead module not loaded'+(window.__thErr?(': '+window.__thErr):' yet (check network/CDN).'));
-    return;
-  }
-  var node=document.getElementById('thStage');
-  try{
-    thHead=new window.TalkingHead(node,{
-      ttsEndpoint:'none', lipsyncModules:['en'], lipsyncLang:'en',
-      cameraView:'upper', modelPixelRatio:window.devicePixelRatio||1
-    });
-  }catch(e){add('error','Could not create TalkingHead: '+e);thHead=null;return;}
-  _thLoad(url);
-}
-function showTHAvatar(url){
-  TH_SELECTED_URL=url;
-  if(avatarMode!=='talkinghead'){setAvatar('talkinghead');return;}
-  if(!thHead){initTalkingHead(url);return;}
-  _thLoad(url);
-}
+function initAvatar(url){
+  if(!window.TalkingHead){add('error','Avatar engine not loaded'+(window.__thErr?': '+window.__thErr:'.'));return;}
+  if(thHead){loadAvatar(url);return;}
+  try{thHead=new window.TalkingHead($('thStage'),{ttsEndpoint:'none',lipsyncModules:['en'],
+    lipsyncLang:'en',cameraView:'upper',modelPixelRatio:window.devicePixelRatio||1});}
+  catch(e){add('error','Could not create avatar: '+e);return;}
+  loadAvatar(url);startMic();}
+function startMic(){if(_micAn||!navigator.mediaDevices)return;
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){micStream=st;
+    var c=ensureCtx();if(!c)return;var src=c.createMediaStreamSource(st);var an=c.createAnalyser();
+    an.fftSize=256;src.connect(an);_micAn=an;_micAd=new Uint8Array(an.frequencyBinCount);})
+   .catch(function(){});}
 
-/* live-mic analyser ONLY (never connected to destination -> no echo/feedback) */
-function startMicMeter(){
-  if(_micAn)return;
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-    add('system','No mic API available for avatar lip-sync.');return;}
-  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-    micStream=stream;var ctx=ensureCtx();if(!ctx)return;
-    var src=ctx.createMediaStreamSource(stream);
-    var an=ctx.createAnalyser();an.fftSize=256;
-    src.connect(an);
-    _micAn=an;_micAd=new Uint8Array(an.frequencyBinCount);
-    add('system','Mic meter on - the TalkingHead avatar will lip-sync to your voice (and to A.T.O. when she speaks).');
-  }).catch(function(e){add('error','Mic access denied for lip-sync: '+e);});
-}
-function stopMicMeter(){
-  if(micStream){try{micStream.getTracks().forEach(function(t){t.stop();});}catch(_){}}
-  micStream=null;_micAn=null;_micAd=null;
-}
-
-function setAvatar(which){
-  avatarMode=(which==='talkinghead')?'talkinghead':'princess';
-  avatarSel.value=avatarMode;
-  var stageCv=document.getElementById('face3d');
-  var thNode=document.getElementById('thStage');
-  if(avatarMode==='talkinghead'){
-    thNode.style.display='block';
-    if(stageCv)stageCv.style.visibility='hidden';
-    if(pcOK&&app){try{app.timeScale=0;}catch(_){}}
-    initTalkingHead();
-    startMicMeter();
-  }else{
-    thNode.style.display='none';
-    if(stageCv)stageCv.style.visibility='visible';
-    if(pcOK&&app){try{app.timeScale=1;}catch(_){}}
-    stopMicMeter();
-    if(thHead)setThMouth(0);
-  }
-}
-avatarSel.onchange=function(){prime();setAvatar(avatarSel.value);};
-
-/* ---- local .glb picker + drag-and-drop ---- */
-function loadGlbs(){
-  fetch('/glbs').then(function(r){return r.json();}).then(function(j){
-    glbList=j.glbs||[];
-    glbSel.innerHTML='<option value="">'+(glbList.length?'Pick avatar .glb\u2026':'No .glb files found')+'</option>';
-    glbList.forEach(function(name){var o=document.createElement('option');
-      o.value=name;o.textContent=name;glbSel.appendChild(o);});
-    if(j.dir)glbSel.title='Folder: '+j.dir+(glbList.length?'':' (empty - edit GLB_DIR or drop a .glb)');
-  }).catch(function(){});
-}
-glbSel.onchange=function(){if(glbSel.value){prime();showTHAvatar('/glb?f='+encodeURIComponent(glbSel.value));}};
-
-var stageEl=document.getElementById('stage');
-['dragenter','dragover'].forEach(function(ev){
-  stageEl.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();
-    stageEl.classList.add('dropping');});});
-['dragleave','dragend'].forEach(function(ev){
-  stageEl.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();
-    stageEl.classList.remove('dropping');});});
-stageEl.addEventListener('drop',function(e){
-  e.preventDefault();e.stopPropagation();stageEl.classList.remove('dropping');
-  var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
-  if(!f)return;
-  if(!/\.glb$/i.test(f.name)){add('error','Please drop a .glb file (got "'+f.name+'").');return;}
-  prime();
-  add('system','Loading dropped avatar: '+f.name);
-  showTHAvatar(URL.createObjectURL(f));
-});
-
-/* =================== AUDIO + VOICE OUTPUT =================== */
+/* ---------- audio / TTS ---------- */
 var actx=null;
-function ensureCtx(){if(!actx){try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}}
-  if(actx&&actx.state==='suspended'){try{actx.resume();}catch(e){}}return actx;}
-function stopHDAudio(){try{if(window._src){window._src.onended=null;window._src.stop();}}catch(e){}
-  window._src=null;window._an=null;}
-function express(text,mood){if(mood)setMood(mood);if(!voiceOn||!text)return;
-  if(ttsEnabled)voiceHD(text,mood);else browserSpeak(text,mood);}
-function pauseMic(){if(rec&&listening){try{rec.stop();}catch(e){}}}
-function resumeMic(){if(micWanted&&rec&&!listening){setTimeout(function(){try{rec.start();}catch(e){}},220);}}
-function voiceHD(text,mood){speaking=true;pauseMic();stopHDAudio();
+function ensureCtx(){if(!actx){try{actx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}}
+  if(actx&&actx.state==='suspended')try{actx.resume();}catch(e){}return actx;}
+function stopHD(){try{if(window._src){window._src.onended=null;window._src.stop();}}catch(e){}window._src=null;window._an=null;}
+function express(text,mood){if(!voiceOn||!text)return;if(ttsEnabled)voiceHD(text,mood);else browserSpeak(text);}
+function voiceHD(text,mood){stopHD();
   fetch('/tts',{method:'POST',headers:{'Content-Type':'application/json','X-ATO-Token':ATO_TOKEN},
     body:JSON.stringify({text:text,mood:mood||'neutral'})})
-   .then(function(r){if(!r.ok)throw new Error('tts '+r.status);return r.arrayBuffer();})
-   .then(function(buf){var ctx=ensureCtx();if(!ctx){browserSpeak(text,mood);return;}
-     ctx.decodeAudioData(buf.slice(0),function(audioBuf){var c=ensureCtx();stopHDAudio();
-       var src=c.createBufferSource();src.buffer=audioBuf;var an=c.createAnalyser();an.fftSize=256;
-       window._ad=new Uint8Array(an.frequencyBinCount);src.connect(an);an.connect(c.destination);
-       window._src=src;window._an=an;faceTalk=true;
-       src.onended=function(){window._an=null;window._src=null;faceTalk=false;speaking=false;
-         mouthTarget=0;setMood('neutral');resumeMic();};
-       src.start();},function(){browserSpeak(text,mood);});})
-   .catch(function(){browserSpeak(text,mood);});}
-var chosenVoice=null;
-function pickVoice(){if(!('speechSynthesis' in window))return;var vs=speechSynthesis.getVoices();
-  chosenVoice=vs.filter(function(v){return /Natural|Online|Neural/i.test(v.name)&&/en/i.test(v.lang);})[0]
-    ||vs.filter(function(v){return /Aria|Jenny|Sonia|Libby|Michelle|Zira/i.test(v.name);})[0]
-    ||vs.filter(function(v){return /en[-_]US/i.test(v.lang);})[0]||vs[0]||null;}
-if('speechSynthesis' in window){speechSynthesis.onvoiceschanged=pickVoice;pickVoice();}
-function browserSpeak(text,mood){try{speaking=true;pauseMic();
-    if(!('speechSynthesis' in window)){flapManual(text);return;}
-    speechSynthesis.cancel();var clean=text.replace(/[*_`#>]/g,' ').slice(0,600);
-    var u=new SpeechSynthesisUtterance(clean);
-    var rate={joy:1.04,frustrated:1.12,relief:0.92,surprise:1.08,thinking:0.96,happy:1.0,neutral:1.0}[mood||'neutral']||1;
-    var pitch={joy:1.2,frustrated:0.85,relief:0.95,surprise:1.3,thinking:0.98,happy:1.1,neutral:1.0}[mood||'neutral']||1;
-    u.rate=rate;u.pitch=pitch;if(chosenVoice)u.voice=chosenVoice;
-    u.onstart=function(){faceTalk=true;};
-    var stop=function(){faceTalk=false;speaking=false;mouthTarget=0;setMood('neutral');resumeMic();};
-    u.onend=stop;u.onerror=stop;speechSynthesis.speak(u);
-  }catch(e){flapManual(text);speaking=false;resumeMic();}}
-function flapManual(text){faceTalk=true;clearTimeout(window._spk);
-  window._spk=setTimeout(function(){faceTalk=false;mouthTarget=0;speaking=false;setMood('neutral');},
-    Math.min(7000,600+(text?text.length*45:600)));}
-var primed=false;
-function prime(){if(primed)return;primed=true;ensureCtx();
-  if('speechSynthesis' in window){try{var u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);}catch(e){}}}
-document.addEventListener('click',prime,{once:true});
-document.addEventListener('keydown',prime,{once:true});
+   .then(function(r){if(!r.ok)throw 0;return r.arrayBuffer();})
+   .then(function(buf){var c=ensureCtx();if(!c){browserSpeak(text);return;}
+     c.decodeAudioData(buf.slice(0),function(ab){stopHD();var s=c.createBufferSource();s.buffer=ab;
+       var an=c.createAnalyser();an.fftSize=256;window._ad=new Uint8Array(an.frequencyBinCount);
+       s.connect(an);an.connect(c.destination);window._src=s;window._an=an;
+       s.onended=function(){window._an=null;window._src=null;};s.start();},function(){browserSpeak(text);});})
+   .catch(function(){browserSpeak(text);});}
+function browserSpeak(text){if(!('speechSynthesis'in window))return;speechSynthesis.cancel();
+  var u=new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g,' ').slice(0,600));speechSynthesis.speak(u);}
+var primed=false;function prime(){if(primed)return;primed=true;ensureCtx();}
+document.addEventListener('click',prime,{once:true});document.addEventListener('keydown',prime,{once:true});
 
-/* =================== VOICE INPUT =================== */
-var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-var rec=null, listening=false, micWanted=false;
-function initRec(){if(!SR){micBtn.disabled=true;micBtn.textContent='mic N/A';return;}
-  rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang='en-US';
-  rec.onstart=function(){listening=true;inp.classList.add('hear');updateMic();};
-  rec.onresult=function(e){var interim='',finalTxt='';
-    for(var i=e.resultIndex;i<e.results.length;i++){var tr=e.results[i][0].transcript;
-      if(e.results[i].isFinal)finalTxt+=tr;else interim+=tr;}
-    if(interim)inp.value=interim;
-    if(finalTxt.trim()){inp.value='';processVoice(finalTxt.trim());}};
-  rec.onerror=function(e){if(e.error==='not-allowed'||e.error==='service-not-allowed'){
-      micWanted=false;add('error','Microphone blocked by the browser. Allow mic access and click the mic again.');}};
-  rec.onend=function(){listening=false;inp.classList.remove('hear');
-    if(micWanted&&!speaking){try{rec.start();}catch(e){}}updateMic();};}
-function updateMic(){if(!SR)return;
-  micBtn.classList.toggle('glowR',micWanted&&listening);
-  micBtn.classList.toggle('glow',micWanted&&!listening);
-  micBtn.textContent=micWanted?(listening?'mic: listening':'mic: ...'):'mic: talk';}
-function processVoice(text){var low=text.toLowerCase().trim();
-  if(pending){
-    if(/^(approve|approved|yes|yeah|yep|yup|go ahead|do it|confirm|proceed|sure|okay|ok|run it)\b/.test(low)){
-      add('system','(approved by voice)');post('/approve',{text:''});}
-    else{add('system','redirect: '+text);post('/approve',{text:text});}return;}
-  if(/^(reset|start over|never ?mind|scrap it)\b/.test(low)){add('reset','Reset.');post('/reset');return;}
-  if(/^(stop|cancel|halt|abort)\b/.test(low)){add('system','Stop.');post('/cancel');return;}
-  if(/(auto mode|automatic mode|go auto|take over)/.test(low)){post('/mode',{mode:'auto'});return;}
-  if(/(step mode|manual mode|ask me|go step)/.test(low)){post('/mode',{mode:'step'});return;}
-  if(/(mute|be quiet|shut up|stop talking)/.test(low)){setVoice(false);return;}
-  if(/(unmute|you can talk|speak up)/.test(low)){setVoice(true);return;}
-  add('system','Goal: '+text);post('/goal',{goal:text});}
-initRec();
-micBtn.onclick=function(){prime();if(!SR)return;micWanted=!micWanted;
-  if(micWanted){try{rec.start();}catch(e){}}else{try{rec.stop();}catch(e){}}updateMic();
-  if(micWanted)add('system','Voice control ON - talk to give goals. Say "stop", "reset", or "yes" to approve.');
-  else add('system','Voice control off.');};
-updateMic();
-
-/* =================== CONSOLE STREAM =================== */
-function add(cls,txt){var d=document.createElement('div');d.className='ln '+cls;
-  d.textContent=txt;con.appendChild(d);con.scrollTop=con.scrollHeight;return d;}
-function showResume(goal){var d=document.createElement('div');d.className='ln system';
-  var b=document.createElement('button');b.className='resume';
-  b.textContent='\u25B6 Resume: '+(goal.length>54?goal.slice(0,54)+'\u2026':goal);
-  b.onclick=function(){add('system','> Resuming: '+goal);post('/goal',{goal:goal});b.disabled=true;};
-  d.appendChild(b);con.appendChild(d);con.scrollTop=con.scrollHeight;}
-var moodByType={done:'joy',error:'frustrated',blocked:'frustrated',crashwarn:'surprise',
-  stall:'surprise',reset:'relief',thought:'thinking',command:'thinking',file:'happy'};
-
-/* poll /ping until a NEW worker (different boot id) is serving, then reload */
-function waitForNewServer(){
-  if(reloading)return; reloading=true;
-  var tries=0;
-  var iv=setInterval(function(){
-    tries++;
-    fetch('/ping',{cache:'no-store'})
-      .then(function(r){return r.json();})
-      .then(function(d){
-        if(MY_BOOT && d.boot && d.boot!==MY_BOOT){clearInterval(iv);location.reload();}
-      })
-      .catch(function(){ /* server down mid-reboot; keep polling */ });
-    if(tries>120){clearInterval(iv);location.reload();}
-  },400);
-}
-
-/* ===== EDIT 2: EventSource carries the token as a query param ===== */
+/* ---------- event stream ---------- */
+function waitNew(){if(reloading)return;reloading=true;var t=0;var iv=setInterval(function(){t++;
+  fetch('/ping',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+    if(MY_BOOT&&d.boot&&d.boot!==MY_BOOT){clearInterval(iv);location.reload();}}).catch(function(){});
+  if(t>120){clearInterval(iv);location.reload();}},400);}
 var es=new EventSource('/stream?t='+encodeURIComponent(ATO_TOKEN));
 es.onmessage=function(e){var ev=JSON.parse(e.data);
-  if(ev.type==='status'){dot.className='dot '+(ev.status==='running'?'running':ev.status==='alive'?'alive':'');
-    mode=ev.mode;modeBtn.textContent='Mode: '+ev.mode.toUpperCase();return;}
-  if(ev.type==='recall'){showResume(ev.goal||ev.text);return;}
-  if(ev.type==='reload'){setWeather('bloom',0.8);add('reload',ev.text||'Rebuilding myself...');
-    express(ev.text||'Rebuilding myself.','joy');waitForNewServer();return;}
+  if(ev.type==='status'){dot.className='dot '+(ev.status==='running'?'running':
+     ev.status==='awaiting'?'awaiting':ev.status==='alive'?'alive':'');
+     mode=ev.mode;modeBtn.textContent='Mode: '+ev.mode.toUpperCase();return;}
+  if(ev.type==='recall'){return;}
+  if(ev.type==='reload'){add('reload',ev.text||'Rebuilding...');express(ev.text,'joy');waitNew();return;}
   if(ev.type==='pending'){pending=true;pcmd.textContent='['+ev.shell+'] '+ev.text;
-    pend.style.display='block';inp.placeholder='Enter/"yes"=approve | type/say a correction';inp.focus();
-    setMood('thinking');return;}
-  if(ev.type==='resolved'){pending=false;pend.style.display='none';
-    inp.placeholder='Type a goal, or click the mic and talk...';return;}
+     pend.style.display='block';inp.focus();return;}
+  if(ev.type==='resolved'){pending=false;pend.style.display='none';return;}
   if(ev.type==='thought'){if(lastThought)lastThought.remove();lastThought=add('thought',ev.text);
-    setMood('thinking');return;}
+     setStageGlow('thinking');return;}
   if(lastThought){lastThought.remove();lastThought=null;}
-  add(ev.type, ev.text);
-  var mood=ev.mood||moodByType[ev.type];
-  // weather reactions
-  if(ev.type==='error'||ev.type==='blocked'){setWeather('storm',1.0);}
-  else if(ev.type==='crashwarn'||ev.type==='stall'){setWeather('storm',0.6);}
-  else if(ev.type==='done'){setWeather('bloom',1);}
-  else if(ev.type==='reset'){setWeather('calm');}
-  if(ev.type==='system'){var em=ev.text.match(/exit code (-?\d+)/);
-    if(em && parseInt(em[1],10)!==0)setWeather('storm',0.7);}
-  if(mood==='frustrated')setWeather('storm',0.45);
-  if(mood==='joy')setWeather('bloom',0.9);
-  // voice
-  if(ev.type==='agent') express(ev.text, mood||'neutral');
-  else if(ev.type==='done') express(ev.text||'All done!','joy');
-  else if(ev.type==='crashwarn') express(ev.text,'surprise');
-  else if(ev.type==='error') express('Something went wrong.','frustrated');
-  else if(ev.type==='reset') express('Okay, I let that go.','relief');
-  else if(mood) setMood(mood);
-};
+  add(ev.type,ev.text);
+  if(ev.mood)setStageGlow(ev.mood);
+  if(ev.type==='agent')express(ev.text,ev.mood||'neutral');
+  else if(ev.type==='ask')express(ev.text,'thinking');
+  else if(ev.type==='done')express(ev.text||'Done!','joy');
+  else if(ev.type==='error')express('Something went wrong.','frustrated');};
 
-/* =================== CONTROLS =================== */
-/* ===== EDIT 2 (cont.): every POST carries the session token ===== */
-function post(p,b){return fetch(p,{method:'POST',
-  headers:{'Content-Type':'application/json','X-ATO-Token':ATO_TOKEN},
-  body:JSON.stringify(b||{})});}
-inp.addEventListener('keydown',function(e){if(e.key!=='Enter')return;var v=inp.value;inp.value='';
-  if(pending){post('/approve',{text:v});}
-  else if(v.trim()){add('system','> Goal: '+v);post('/goal',{goal:v});}});
-document.getElementById('stop').onclick=function(){post('/cancel');};
-document.getElementById('reset').onclick=function(){add('reset','Reset requested.');post('/reset');};
-document.getElementById('rollback').onclick=function(){
-  if(!confirm('Roll back to the previous saved build and reboot?'))return;
-  add('system','Rollback requested...');post('/rollback');};
+/* ---------- input ---------- */
+function send(){var v=inp.value;inp.value='';if(!v.trim())return;
+  if(pending){post('/approve',{text:v});add('you',v);return;}
+  add('you',v);post('/message',{text:v});}
+$('send').onclick=send;
+inp.addEventListener('keydown',function(e){if(e.key==='Enter')send();});
+$('stop').onclick=function(){post('/cancel');};
 modeBtn.onclick=function(){post('/mode',{mode:mode==='step'?'auto':'step'});};
-document.getElementById('models').onclick=function(){fetch('/models').then(function(r){return r.json();})
-  .then(function(j){add('system','Models available to your key:\n'+(j.models||j.error||'none'));});};
-function setMem(on){memBtn.classList.toggle('glow',on);memBtn.textContent=on?'Memory: ON':'Memory: OFF';}
-memBtn.onclick=function(){post('/memory/toggle').then(function(r){return r.json();})
-  .then(function(j){setMem(j.memory_on);});};
-function setVoice(on){voiceOn=on;voiceBtn.classList.toggle('glow',on);
-  voiceBtn.textContent=on?'voice: on':'voice: muted';
-  if(!on){if('speechSynthesis' in window)speechSynthesis.cancel();stopHDAudio();faceTalk=false;mouthTarget=0;}}
+
+/* ---------- 'k' fullscreen avatar ---------- */
+document.addEventListener('keydown',function(e){
+  if(e.target===inp)return;
+  if(e.key==='k'||e.key==='K'){
+    if(document.fullscreenElement)document.exitFullscreen();
+    else stageEl.requestFullscreen().catch(function(){});}});
+document.addEventListener('fullscreenchange',function(){setTimeout(function(){
+  window.dispatchEvent(new Event('resize'));},120);});
+
+/* ---------- settings popup ---------- */
+$('gear').onclick=function(){overlay.style.display='flex';loadGlbs();loadBackups();};
+$('closeSet').onclick=function(){overlay.style.display='none';};
+overlay.onclick=function(e){if(e.target===overlay)overlay.style.display='none';};
+function loadGlbs(){fetch('/glbs').then(function(r){return r.json();}).then(function(j){
+  var list=j.glbs||[];glbSel.innerHTML='';
+  list.forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;glbSel.appendChild(o);});
+  if(DEFAULT_GLB&&list.indexOf(DEFAULT_GLB)>=0)glbSel.value=DEFAULT_GLB;});}
+glbSel.onchange=function(){if(glbSel.value){prime();initAvatar('/glb?f='+encodeURIComponent(glbSel.value));}};
+function loadBackups(){fetch('/backups').then(function(r){return r.json();}).then(function(list){
+  verSel.innerHTML='<option value="">\u2014 pick \u2014</option>';
+  list.forEach(function(b){var o=document.createElement('option');o.value=b.file;
+    o.textContent=b.ts+(b.reason?' \u2014 '+b.reason:'');verSel.appendChild(o);});});}
+verSel.onchange=function(){verRestore.disabled=!verSel.value;};
+verRestore.onclick=function(){if(!verSel.value)return;
+  if(!confirm('Restore '+verSel.value+'?'))return;add('system','Restoring...');post('/rollback',{to:verSel.value});};
+micBtn.onclick=function(){prime();if(!_micAn){startMic();micBtn.textContent='mic: on';micBtn.classList.add('glow');}
+  else{if(micStream)micStream.getTracks().forEach(function(t){t.stop();});_micAn=null;_micAd=null;
+    micBtn.textContent='mic: off';micBtn.classList.remove('glow');}};
+function setVoice(on){voiceOn=on;voiceBtn.textContent=on?'voice: on':'voice: muted';
+  voiceBtn.classList.toggle('glow',on);if(!on){if('speechSynthesis'in window)speechSynthesis.cancel();stopHD();}}
 voiceBtn.onclick=function(){setVoice(!voiceOn);};
-setVoice(true);
+function setMem(on){memBtn.textContent=on?'Memory: ON':'Memory: OFF';memBtn.classList.toggle('glow',on);}
+memBtn.onclick=function(){post('/memory/toggle').then(function(r){return r.json();}).then(function(j){setMem(j.memory_on);});};
+$('models').onclick=function(){fetch('/models').then(function(r){return r.json();})
+  .then(function(j){add('system','Models:\n'+(j.models||j.error||'none'));});};
+$('newConv').onclick=function(){if(confirm('Start a fresh conversation? (history cleared)')){post('/new');
+  con.innerHTML='';overlay.style.display='none';}};
+$('rollback').onclick=function(){if(confirm('Roll back to previous build and reboot?')){add('system','Rollback...');post('/rollback');}};
+$('reset').onclick=function(){add('reset','Reset requested.');post('/reset');};
 
-/* =================== VERSION PICKER (commit history) =================== */
-function fmtTs(ts){return ts;}
-function loadBackups(){
-  fetch('/backups').then(function(r){return r.json();}).then(function(list){
-    verSel.innerHTML='<option value="">\u2014 pick a version \u2014</option>';
-    list.forEach(function(b){
-      var o=document.createElement('option');
-      o.value=b.file;
-      o.textContent=fmtTs(b.ts)+(b.reason?(' \u2014 '+b.reason):'');
-      o.dataset.thumb=b.thumb||'';
-      verSel.appendChild(o);
-    });
-  }).catch(function(e){console.warn('backups load failed',e);});
-}
-verSel.onchange=function(){
-  var o=verSel.selectedOptions[0], t=o&&o.dataset.thumb;
-  if(t){verThumb.src=t;verThumb.style.display='inline-block';}
-  else{verThumb.style.display='none';}
-  verRestore.disabled=!(o&&o.value);
-};
-verRestore.onclick=function(){
-  var f=verSel.value; if(!f)return;
-  if(!confirm('Restore '+f+'?\nThe agent validates it, snapshots, and reboots.'))return;
-  add('system','Restoring '+f+'...');
-  post('/rollback',{to:f});
-};
-function snapshotCurrent(){
-  if(!window.html2canvas)return;
-  html2canvas(document.body,{scale:0.35,logging:false,backgroundColor:null,
-    ignoreElements:function(el){return el.id==='thStage'||el.tagName==='CANVAS';}})
-   .then(function(canvas){post('/snapshot',{png:canvas.toDataURL('image/jpeg',0.6)});})
-   .catch(function(){});
-}
-
-/* =================== BOOT =================== */
+/* ---------- boot ---------- */
 fetch('/ping').then(function(r){return r.json();}).then(function(d){MY_BOOT=d.boot;}).catch(function(){});
+fetch('/conversation').then(function(r){return r.json();}).then(function(j){
+  (j.messages||[]).forEach(function(m){add(m.who==='you'?'you':'agent',m.text);});}).catch(function(){});
 fetch('/info').then(function(r){return r.json();}).then(function(j){
-  /* ===== EDIT 3: apply the server-supplied THEME to the CSS variables ===== */
-  var th=j.theme||{}, root=document.documentElement.style;
-  if(th.bg)root.setProperty('--bg',th.bg); if(th.panel)root.setProperty('--panel',th.panel);
-  if(th.line)root.setProperty('--line',th.line); if(th.txt)root.setProperty('--txt',th.txt);
-  if(th.mut)root.setProperty('--mut',th.mut); if(th.accentY)root.setProperty('--y',th.accentY);
-  if(th.accentB)root.setProperty('--b',th.accentB); if(th.accentG)root.setProperty('--g',th.accentG);
-  if(th.accentP)root.setProperty('--p',th.accentP); if(th.accentR)root.setProperty('--r',th.accentR);
-  if(th.accentCy)root.setProperty('--cy',th.accentCy);
-
-  modelPill.textContent=j.model;formPill.textContent='form: '+(j.form||'');setMem(j.memory_on);
-  ttsEnabled=!!j.tts;MODEL_URL=j.model_url||'';MODEL_SCALE=j.model_scale||1;MODEL_Y=j.model_y||0;
-  if(MODEL_URL)loadModelHead();
-  if(j.avatar==='talkinghead'){setAvatar('talkinghead');}else{avatarSel.value='princess';}
-  if(!j.tts)add('system','HD voice (OpenAI TTS) is off - using the browser voice. Set TTS_ENABLED=True to upgrade.');});
-loadGlbs();
-loadBackups();
-setTimeout(snapshotCurrent,1500);
+  var th=j.theme||{},root=document.documentElement.style;
+  Object.keys({bg:'--bg',panel:'--panel',line:'--line',txt:'--txt',mut:'--mut',accentY:'--y',
+    accentB:'--b',accentG:'--g',accentP:'--p',accentR:'--r',accentCy:'--cy'}).forEach(function(k){
+    var map={bg:'--bg',panel:'--panel',line:'--line',txt:'--txt',mut:'--mut',accentY:'--y',
+      accentB:'--b',accentG:'--g',accentP:'--p',accentR:'--r',accentCy:'--cy'};
+    if(th[k])root.setProperty(map[k],th[k]);});
+  modelPill.textContent=j.model;ttsEnabled=!!j.tts;setMem(j.memory_on);
+  DEFAULT_GLB=j.default_glb||'';
+  if(DEFAULT_GLB)setTimeout(function(){prime();initAvatar('/glb?f='+encodeURIComponent(DEFAULT_GLB));},300);
+  if(!j.tts)add('system','HD voice off - using browser voice.');});
 fetch('/hello');
 </script></body></html>

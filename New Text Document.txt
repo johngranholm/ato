@@ -1,0 +1,6 @@
+del ato\plugins\custom_requested.py
+
+git add ato/plugins/__init__.py ato/core/agent_loop.py
+git commit -m "Clarify app-building vs plugins; add registry aliases for self-healing plugins"
+git push
+git branch -f lastgood HEAD && git push origin lastgood
